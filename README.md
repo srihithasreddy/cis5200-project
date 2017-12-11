@@ -80,88 +80,61 @@ order by sum desc limit 20;
 
 Q3 What is the total monthly comparison between Credit and Cash payments?
 
-DROP TABLE IF EXISTS one_1;
+DROP TABLE IF EXISTS payment;
 
-CREATE EXTERNAL TABLE IF NOT EXISTS one_1(trip_id int, 
-trip_start_timestamp timestamp, 
-trip_end_timestamp timestamp, 
-trip_seconds Int, 
-trip_miles float, 
-pickup_census_tract Int, 
-dropoff_census_tract Int, 
-pickup_community_area Int, 
-dropoff_community_area Int, 
-fare float, 
-tips float, 
-tolls float, 
-extras float, 
-trip_total float, 
-payment_type String, 
-company Int, 
-pickup_latitude Int, 
-pickup_longitude Int, 
-dropoff_latitude Int, 
-dropoff_longitude Int)
-ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
-STORED AS TEXTFILE LOCATION '/user/nshrist/project1'
+CREATE EXTERNAL TABLE IF NOT EXISTS payment
+(trip_id int, trip_start_timestamp timestamp, trip_end_timestamp timestamp, trip_seconds Int, trip_miles float, pickup_census_tract Int, dropoff_census_tract Int, pickup_community_area Int, dropoff_community_area Int, fare float, tips float, tolls float, extras float, trip_total float, payment_type String, company Int, pickup_latitude Int, pickup_longitude Int, dropoff_latitude Int, dropoff_longitude Int)
+ ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' 
+STORED AS TEXTFILE LOCATION '/user/hbatra/project' 
 TBLPROPERTIES("skip.header.line.count"="1");
 
-LOAD DATA INPATH  '/user/nshrist/project/chicago_taxi_trips_2016_01.csv’ OVERWRITE INTO TABLE one_1;
-Drop table if exists one_2;
-create external table one_2 (payment_type String,fare float)ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
-STORED AS TEXTFILE LOCATION '/user/nshrist/one_2/';
 
-INSERT OVERWRITE TABLE one_2 Select payment_type,sum(fare) as Total_fare from one_1 group by payment_type,order by Total_fare;
-Repeat the same for all the 12 months.
+LOAD DATA INPATH '/user/hbatra/chicago/chicago_taxi_trips_2016_01.csv’ OVERWRITE INTO TABLE payment;
+
+hdfs dfs -ls chicago/chicago_taxi_trips_2016_01.csv
+
+Drop table if exists payment_1;
+
+Create external table payment_1 
+(payment_type String,fare float)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' 
+STORED AS TEXTFILE LOCATION '/user/hbatra/payment_1/';
+
+INSERT OVERWRITE TABLE payment_1 
+Select payment_type,sum(fare) as Total_fare from payment group by payment_type,order by Total_fare;
+
+Repeat the same for all rest 11 months
 
 Q4 What is the total number of monthly pick-ups in Chicago(2016)?
 
-Hdfs dfs –mkdir project1
-Hive 
-//Create table 
-DROP TABLE IF EXISTS one_1;
-
-CREATE EXTERNAL TABLE IF NOT EXISTS one_1(trip_id int, 
-trip_start_timestamp timestamp, 
-trip_end_timestamp timestamp, 
-trip_seconds Int, 
-trip_miles float, 
-pickup_census_tract Int, 
-dropoff_census_tract Int, 
-pickup_community_area Int, 
-dropoff_community_area Int, 
-fare float, 
-tips float, 
-tolls float, 
-extras float, 
-trip_total float, 
-payment_type String, 
-company Int, 
-pickup_latitude Int, 
-pickup_longitude Int, 
-dropoff_latitude Int, 
-dropoff_longitude Int)
-ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
-STORED AS TEXTFILE LOCATION '/user/nshrist/project1'
+CREATE EXTERNAL TABLE IF NOT EXISTS frequency
+(trip_id int, trip_start_timestamp timestamp, trip_end_timestamp timestamp, trip_seconds Int, trip_miles float, pickup_census_tract Int, dropoff_census_tract Int, pickup_community_area Int, dropoff_community_area Int, fare float, tips float, tolls float, extras float, trip_total float, payment_type String, company Int, pickup_latitude Int, pickup_longitude Int, dropoff_latitude Int, dropoff_longitude Int)
+ ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' 
+STORED AS TEXTFILE LOCATION '/user/hbatra/project1' 
 TBLPROPERTIES("skip.header.line.count"="1");
 
-LOAD DATA INPATH  '/user/nshrist/project/chicago_taxi_trips_2016_01.csv’ OVERWRITE INTO TABLE one_1;
+LOAD DATA INPATH '/user/hbatra/chicago/chicago_taxi_trips_2016_01.csv' OVERWRITE INTO TABLE frequency;
+hdfs dfs -ls chicago/chicago_taxi_trips_2016_01.csv
 
-Drop table if exists demand_1;
+Drop table if exists frequency_1;
 
-create external table demand_1 (trip_id int)ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS TEXTFILE LOCATION '/user/nshrist/demand_1/';
+Create external table frequency_1 
+(trip_id int)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' 
+STORED AS TEXTFILE LOCATION '/user/hbatra/frequency_1/';
 
-INSERT OVERWRITE TABLE demand_1 Select count(trip_id) from one_1;
-Repeat the same for all the 12 months.
+INSERT OVERWRITE TABLE frequency_1 Select count(trip_id) from frequency;
+
+Repeat the same for al rest 11 months.
 
 Q5 Which community of Chicago has the maximum miles travelled by taxi in 2016?
 
-REGISTER '/home/nshrist/piggybank-0.13.0.jar';
-DEFINE CSVExcelStorage org.apache.pig.piggybank.storage.CSVExcelStorage
+Hdfs dfs –mkdir project2
+Hdfs dfs –put *.csv project2
 
-vi summiles.pig
+Vi summiles.pig
 
-chicagoNew = load '/user/nshrist/project1/' USING PigStorage(',')
+chicagoNew = load '/user/hbatra/project2/' USING PigStorage(',')
 AS 
 (taxi_id:Int, 
 trip_start_timestamp:chararray, 
@@ -190,18 +163,13 @@ grpmiles = GROUP chicagoNew by pickup_community_area;
 
 summiles = FOREACH grpmiles GENERATE group as pickup_community_area, SUM(chicagoNew.trip_miles) as sum_tripmiles;
 
-STORE summiles INTO '/user/nshrist/output/Summiles_community' USING org.apache.pig.piggybank.storage.CSVExcelStorage ('Commuity_in_Chicago','Total_miles');
+STORE summiles INTO '/user/hbatra/output/Summiles_community' USING PigStorage(',');
 
 Pig summiles.pig
 
 Q6 Which communities in Chicago have the highest demand for pick-ups and Drop-offs?
 
-hdfd dfs -mkdir project
-
-HIVE
-
 DROP TABLE IF EXISTS area;
-
 CREATE EXTERNAL TABLE IF NOT EXISTS area(taxi_id int, 
 trip_start_timestamp timestamp, 
 trip_end_timestamp timestamp, 
@@ -223,14 +191,13 @@ pickup_longitude Int,
 dropoff_latitude Int, 
 dropoff_longitude Int)
 ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
-STORED AS TEXTFILE LOCATION '/user/hbatra09/project';
+STORED AS TEXTFILE LOCATION '/user/hbatra/chicago';
 
-CREATE TABLE IF NOT EXISTS Pick_Drop
-as
-select pickup_community_area, count(pickup_community_area ) as Total_Community_Count, dropoff_community_area, count(dropoff_community_area ) as Total_Dropoff_Count
-from area
-GROUP BY pickup_community_area ,dropoff_community_area
-ORDER BY Total_Community_Count DESC LIMIT 50;
+
+CREATE TABLE IF NOT EXISTS Pick_Drop 
+as select pickup_community_area, count(pickup_community_area ) as Total_Community_Count, dropoff_community_area, count(dropoff_community_area ) as Total_Dropoff_Count from area 
+GROUP BY pickup_community_area ,dropoff_community_area 
+ORDER BY Total_Community_Count DESC LIMIT 20;
 
 Q7 Which hour of the day and which day of the month has most pickups in New York?
 hdfd dfs -mkdir project
